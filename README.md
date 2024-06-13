@@ -4,7 +4,8 @@ Developed a real-time facial recognition application using OpenCV joined with Fl
 
 ![Screenshot 2024-06-12 at 10 29 38 PM](https://github.com/yashbbb009/FacialRecog/assets/165434548/0364b0dc-fcb1-4364-b7c6-4713da9e50e7)
 
-This project utilizes Flask, a micro web framework in Python, to execute an OpenCV facial recognition model. It functions by capturing input from a webcam connected to your computer and creates a database of facial data to recognize a face. 
+This project is the development of a web application that integrates real-time facial recognition capabilities using Flask, a micro web framework in Python, for handling user interactions and OpenCV for computer vision tasks. The application allows users to create training datasets by capturing face images, trains a face recognition model using LBPH, and recognizes and differentiates individuals in real-time by streaming video frames to the client from a webcame connected to your computer.
+
 
 Installation
 ensure you have the following installed
