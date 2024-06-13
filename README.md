@@ -1,3 +1,5 @@
+## Facial Recognition Application 
+
 Developed a real-time facial recognition application using OpenCV joined with Flask, capable of recognizing and differentiating up to two simultaneous users with a ~95% accuracy rate.
 
 ![Screenshot 2024-06-12 at 10 29 38 PM](https://github.com/yashbbb009/FacialRecog/assets/165434548/0364b0dc-fcb1-4364-b7c6-4713da9e50e7)
