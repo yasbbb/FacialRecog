@@ -1,147 +1,150 @@
-
 import cv2
 import numpy as np
-from PIL import Image #pillow package
+from PIL import Image
 import os
 
 class VideoCamera(object):
     def __init__(self):
-        self.video = cv2.VideoCapture(-1)
+        # Initialize video capture from webcam
+        self.video = cv2.VideoCapture(0)
+        # Initialize the LBPH face recognizer
         self.recognizer = cv2.face.LBPHFaceRecognizer_create()
+        # Load the face detection model (Haarcascade)
         self.cascade_path = "haarcascade_frontalface_default.xml"
-        self.trained_loc = "trainer/trainer.yml" 
-        self.recognizer.read(self.trained_loc)
+        # Path to save/load trained face data
+        self.trained_loc = "trainer/trainer.yml"
+        # Load the trained model if it exists
+        if os.path.exists(self.trained_loc):
+            self.recognizer.read(self.trained_loc)
+        # Initialize the face detector
         self.faceCascade = cv2.CascadeClassifier(self.cascade_path)
-        self.i = 0
-
 
     def __del__(self):
+        # Release the video capture when the object is deleted
         self.video.release()
-        
-    def create_dataset(self,face_id):
-        self.video.set(3, 640) # set video width
-        self.video.set(4, 480) # set video height
 
-        #make sure 'haarcascade_frontalface_default.xml' is in the same folder as this code
+    def create_dataset(self, face_id):
+        # Set video frame dimensions
+        self.video.set(3, 640)
+        self.video.set(4, 480)
 
-        # For ea ch person, enter one numeric face id (must enter number start from 1, this is the lable of person 1)
+        print("\n[INFO] Initializing face capture. Look at the camera...")
 
-        print("\n [INFO] Initializing face capture. Look the camera and wait ...")
-        # Initialize individual sampling face count
-        count = 0
+        count = 0  # Initialize image count
 
-        #start detect your face and take 30 pictures
-        while(True):
-
+        while True:
+            # Capture frame-by-frame
             ret, img = self.video.read()
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             faces = self.faceCascade.detectMultiScale(gray, 1.3, 5)
 
-            for (x,y,w,h) in faces:
-
-                cv2.rectangle(img, (x,y), (x+w,y+h), (255,0,0), 2)     
+            for (x, y, w, h) in faces:
+                # Draw a rectangle around detected face
+                cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 0), 2)
                 count += 1
+                # Save the captured face into the dataset folder
+                cv2.imwrite(f"dataset/User.{face_id}.{count}.jpg", gray[y:y+h, x:x+w])
 
-                # Save the captured image into the datasets folder
-                cv2.imwrite("dataset/User." + str(face_id) + '.' + str(count) + ".jpg", gray[y:y+h,x:x+w])
-
-
-            k = cv2.waitKey(100) & 0xff # Press 'ESC' for exiting video
-            if k == 27:
-                break
-            elif count >= 30: # Take 30 face sample and stop video
+            # Break if 'ESC' key is pressed or 30 images are captured
+            k = cv2.waitKey(100) & 0xff
+            if k == 27 or count >= 30:
                 break
 
-        # Do a bit of cleanup
-        print("\n [INFO] Exiting Program and cleanup stuff")
+        print("\n[INFO] Dataset created. Exiting capture mode.")
         self.video.release()
         cv2.destroyAllWindows()
 
-    def getImagesAndLabels(self,path):
+    def getImagesAndLabels(self, path):
+        # Function to extract images and their labels from the dataset
+        imagePaths = [os.path.join(path, f) for f in os.listdir(path)]     
+        faceSamples = []  # List to hold face data
+        ids = []  # List to hold user IDs
+        detector = cv2.CascadeClassifier(self.cascade_path)  # Initialize face detector
 
-            imagePaths = [os.path.join(path,f) for f in os.listdir(path)]     
-            faceSamples=[]
-            ids = []
-            detector = cv2.CascadeClassifier(self.cascade_path)
-            for imagePath in imagePaths:
+        for imagePath in imagePaths:
+            # Convert image to grayscale and retrieve ID from filename
+            PIL_img = Image.open(imagePath).convert('L')
+            img_numpy = np.array(PIL_img, 'uint8')
+            id = int(os.path.split(imagePath)[-1].split(".")[1])
+            faces = detector.detectMultiScale(img_numpy)
 
-                PIL_img = Image.open(imagePath).convert('L') # convert it to grayscale
-                img_numpy = np.array(PIL_img,'uint8')
+            for (x, y, w, h) in faces:
+                # Append the face data and associated ID to the lists
+                faceSamples.append(img_numpy[y+y+h, x+x+w])
+                ids.append(id)
 
-                id = int(os.path.split(imagePath)[-1].split(".")[1])
-                faces = detector.detectMultiScale(img_numpy)
+        return faceSamples, ids
 
-                for (x,y,w,h) in faces:
-                    faceSamples.append(img_numpy[y:y+h,x:x+w])
-                    ids.append(id)
-            return faceSamples,ids
-            
-    def train_model(self,path):
-        camera = VideoCamera()
-        # Path for face image database
-        print ("\n [INFO] Training faces. It will take a few seconds. Wait ...")
-        faces,ids = camera.getImagesAndLabels(path)
-        self.recognizer.train(faces, np.array(ids))
+    def train_model(self, path):
+        # Train the face recognizer with images from the dataset
+        print("\n[INFO] Training faces. Please wait...")
+        faces, ids = self.getImagesAndLabels(path)  # Extract images and labels
+        self.recognizer.train(faces, np.array(ids))  # Train the LBPH recognizer
 
-        # Save the model into trainer/trainer.yml
-        self.recognizer.write('trainer/trainer.yml') # recognizer.save() worked on Mac, but not on Pi
+        # Save the trained model to the trainer directory
+        self.recognizer.write('trainer/trainer.yml')
+        print(f"\n[INFO] {len(np.unique(ids))} faces trained. Model saved.")
 
-        # Print the numer of faces trained and end program
+        # Release video and destroy all windows
         self.video.release()
         cv2.destroyAllWindows()
-        print("\n [INFO] {0} faces trained. Exiting Program".format(len(np.unique(ids))))
-    def run_model(self,names,n_of_persons):
-        #Parameters
-        #n_of_persons--> number of persons which the model should recognise(INT)
-        #names --> names of the persons you want to recognise(array)yth
 
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        #iniciate id counter, the number of persons you want to include
-        # Initialize and start realtime video capture
-        self.video.set(3, 640) # set video widht
-        self.video.set(4, 480) # set video height
+    def run_model(self, names, n_of_persons):
+        # Parameters:
+        # 'names' --> list of user names to be recognized
+        # 'n_of_persons' --> number of users to be recognized (e.g., 1 or 2)
 
-        # Define min window size to be recognized as a face
-        minW = 0.1*self.video.get(3)
-        minH = 0.1*self.video.get(4)
-        
-        
+        font = cv2.FONT_HERSHEY_SIMPLEX  # Font for displaying names on screen
+
+        self.video.set(3, 640)  # Set video width
+        self.video.set(4, 480)  # Set video height
+
+        # Minimum window size to detect a face
+        minW = 0.1 * self.video.get(3)
+        minH = 0.1 * self.video.get(4)
 
         while True:
+            # Read a frame from the video feed
             ret, img = self.video.read()
+
             try:
-                gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+                gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             except:
+                # If an error occurs, restart video capture
                 self.video.release()
                 cv2.destroyAllWindows()
                 self.video = cv2.VideoCapture(0)
                 ret, img = self.video.read()
-                gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+                gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-            faces = self.faceCascade.detectMultiScale( 
+            # Detect faces in the frame
+            faces = self.faceCascade.detectMultiScale(
                 gray,
-                scaleFactor = 1.2,
-                minNeighbors = 5,
-                minSize = (int(minW), int(minH)),
+                scaleFactor=1.2,
+                minNeighbors=5,
+                minSize=(int(minW), int(minH)),
             )
 
-            for(x,y,w,h) in faces:
+            for (x, y, w, h) in faces:
+                # Draw rectangle around detected face
+                cv2.rectangle(img, (x, y), (x+w, y+h), (0, 255, 0), 2)
 
-                cv2.rectangle(img, (x,y), (x+w,y+h), (0,255,0), 2)
+                # Predict the face using the recognizer
+                id, confidence = self.recognizer.predict(gray[y+y+h, x+x+w])
 
-                id, confidence = self.recognizer.predict(gray[y:y+h,x:x+w])
-
-                # Check if confidence is less them 100 ==> "0" is perfect match 
-                confidence_calc = 100-confidence
-                if (confidence_calc > 0):
-                    id = names[id]
-                    confidence = "  {0}%".format(round(confidence_calc))
+                # Calculate confidence score
+                confidence_calc = 100 - confidence
+                if confidence_calc > 0:
+                    id = names[id]  # Retrieve user name
+                    confidence = f"  {round(confidence_calc)}%"
                 else:
                     id = "unknown"
-                    confidence = "  {0}%".format(round(confidence_calc))
-                
-                cv2.putText(img, str(id), (x+5,y-5), font, 1, (255,255,255), 2)
-                cv2.putText(img, str(confidence), (x+5,y+h-5), font, 1, (255,255,0), 1)
-                #break
-            ret , jpeg = cv2.imencode('.jpg',img)
+                    confidence = f"  {round(confidence_calc)}%"
+
+                # Display the name and confidence on the screen
+                cv2.putText(img, str(id), (x+5, y-5), font, 1, (255, 255, 255), 2)
+                cv2.putText(img, str(confidence), (x+5, y+h-5), font, 1, (255, 255, 0), 1)
+
+            # Encode the frame and return as a byte stream
+            ret, jpeg = cv2.imencode('.jpg', img)
             return jpeg.tobytes()
