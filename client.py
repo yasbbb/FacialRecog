@@ -9,32 +9,35 @@ names = []
 
 @app.route('/', methods=["GET", "POST"])
 def index():
-    # Handle both GET and POST requests
-    if request.method == "POST":
-        req = request.form
-        User_1 = req.get("User1")  # Get User1 name from form
-        global names
-        names = ["", User_1]  # Store User1 name globally
+    try:
+        if request.method == "POST":
+            req = request.form
+            User_1 = req.get("User1")  # Get User1 name from form
+            global names
+            names = ["", User_1]  # Store User1 name globally
 
-        if 'Run' in request.form:
-            # Render the main template to start the video feed
-            return render_template('index.html')
+            if 'Run' in request.form:
+                return render_template('index.html')
 
-        if 'Create_Dataset' in request.form:
-            # Create a dataset for the first user
-            face_id = 1
-            camera = VideoCamera()  # Initialize camera
-            camera.create_dataset(face_id)  # Capture 30 face images for training
-            return render_template('index.html')
+            if 'Create_Dataset' in request.form:
+                # Add logging to catch errors here
+                print(f"Creating dataset for User 1: {User_1}")
+                face_id = 1
+                camera = VideoCamera()
+                camera.create_dataset(face_id)
+                return render_template('index.html')
 
-        if 'Train_Dataset' in request.form:
-            # Train the face recognition model using the dataset
-            camera = VideoCamera()  # Initialize camera
-            camera.train_model("dataset")  # Train the model using images
-            return render_template('processing.html')
+            if 'Train_Dataset' in request.form:
+                camera = VideoCamera()
+                camera.train_model("dataset")
+                return render_template('processing.html')
 
-    # Default render for GET requests
-    return render_template('index.html')
+    except Exception as e:
+        # Log the exception to get more details
+        print(f"Error during dataset creation for User 1: {e}")
+        error = "An error occurred. Please read the instructions and repeat the process."
+        return render_template('ErrorPage.html')
+
 
 
 # Function to generate video feed
