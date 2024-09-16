@@ -18,7 +18,7 @@ def index():
             face_id=1
             camera = VideoCamera()
             camera.create_dataset(face_id)
-            #Print Image Dataset Created correctly
+            #Print Image Dataset created correctly
             return render_template('index.html')
             
 
